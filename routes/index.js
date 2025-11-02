@@ -2,6 +2,7 @@ import express from 'express';
 import facultyRoutes from './faculty.js';
 import authRoutes from './auth.js';
 import appointmentRoutes from './appointments.js';
+import complaintRoutes from './complaints.js';
 
 const router = express.Router();
 
@@ -23,6 +24,9 @@ router.use('/faculty', facultyRoutes);
 
 // Appointment routes
 router.use('/appointments', appointmentRoutes);
+
+// Complaint routes
+router.use('/complaints', complaintRoutes);
 
 export default router;
 
