@@ -13,6 +13,13 @@ MONGODB_URI=mongodb+srv://vermanaman2106_db_user:gqpuuxVjYznv4uIF@cluster0.gcms4
 
 # JWT Secret Key (IMPORTANT: Change this to a secure random string)
 JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+
+# Email Configuration (for password reset)
+EMAIL_USER=your-email@gmail.com
+EMAIL_PASSWORD=your-app-password
+
+# Frontend URL (for reset password links)
+FRONTEND_URL=http://localhost:8081
 ```
 
 ## Security Note
@@ -45,6 +52,14 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
   - Returns: `{ token, user }`
 
 - `GET /api/auth/me` - Get current user (requires Bearer token)
+
+- `POST /api/auth/forgot-password` - Request password reset
+  - Body: `{ email }`
+  - Sends password reset email with token
+
+- `POST /api/auth/reset-password` - Reset password
+  - Body: `{ resetToken, password }`
+  - Returns: `{ token }` for automatic login
 
 ### Faculty
 - `GET /api/faculty` - Get all faculty members
