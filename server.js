@@ -44,10 +44,12 @@ app.use((req, res) => {
 });
 
 // Start server
-const server = app.listen(PORT, '127.0.0.1', () => {
-  console.log(`✅ Server is running on port ${PORT}`);
-  console.log(`📍 API: http://localhost:${PORT}`);
-  console.log(`🔍 Health check: http://localhost:${PORT}/api/health`);
+// Bind to 0.0.0.0 to allow external connections (required for deployment)
+const HOST = process.env.HOST || '0.0.0.0';
+const server = app.listen(PORT, HOST, () => {
+  console.log(`✅ Server is running on ${HOST}:${PORT}`);
+  console.log(`📍 API: http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
+  console.log(`🔍 Health check: http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}/api/health`);
   console.log(`💾 MongoDB connection initiated...`);
 }).on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
