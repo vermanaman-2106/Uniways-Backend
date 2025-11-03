@@ -1,6 +1,7 @@
 import Appointment from '../models/Appointment.js';
 import User from '../models/User.js';
 import FacultyProfile from '../models/Faculty.js';
+import { sendAppointmentNotificationEmail, sendAppointmentStatusEmail } from '../utils/sendEmail.js';
 
 // Create appointment (Student only)
 export const createAppointment = async (req, res) => {
@@ -103,6 +104,26 @@ export const createAppointment = async (req, res) => {
     // Populate student and faculty details
     await appointment.populate('studentId', 'name email');
     await appointment.populate('facultyId', 'name email department');
+
+    // Try to send notification email to faculty (non-blocking for user response)
+    try {
+      if (appointment.facultyId?.email) {
+        await sendAppointmentNotificationEmail({
+          toEmail: appointment.facultyId.email,
+          facultyName: appointment.facultyId.name,
+          studentName: appointment.studentId.name,
+          studentEmail: appointment.studentId.email,
+          date: appointment.date,
+          time: appointment.time,
+          duration: appointment.duration,
+          reason: appointment.reason,
+        });
+      } else {
+        console.warn('Faculty email missing; skipping email notification');
+      }
+    } catch (emailErr) {
+      console.warn('Failed to send appointment notification email:', emailErr?.message || emailErr);
+    }
 
     res.status(201).json({
       success: true,
@@ -278,6 +299,28 @@ export const updateAppointmentStatus = async (req, res) => {
     await appointment.save();
     await appointment.populate('studentId', 'name email');
     await appointment.populate('facultyId', 'name email department designation');
+
+    // Send status email to student (best-effort; do not block response)
+    try {
+      if (appointment.studentId?.email) {
+        await sendAppointmentStatusEmail({
+          toEmail: appointment.studentId.email,
+          studentName: appointment.studentId.name,
+          facultyName: appointment.facultyId?.name,
+          status,
+          date: appointment.date,
+          time: appointment.time,
+          duration: appointment.duration,
+          reason: appointment.reason,
+          meetingLink: appointment.meetingLink,
+          facultyNotes: appointment.facultyNotes,
+        });
+      } else {
+        console.warn('Student email missing; skipping student status email');
+      }
+    } catch (emailErr) {
+      console.warn('Failed to send appointment status email to student:', emailErr?.message || emailErr);
+    }
 
     res.status(200).json({
       success: true,

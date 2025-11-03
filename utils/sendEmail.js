@@ -173,3 +173,168 @@ export const sendPasswordResetEmail = async (email, resetToken) => {
   }
 };
 
+export const sendAppointmentNotificationEmail = async ({
+  toEmail,
+  facultyName,
+  studentName,
+  studentEmail,
+  date,
+  time,
+  duration,
+  reason,
+}) => {
+  if (!transporter) {
+    throw new Error('Email transporter is not configured. Please set EMAIL_USER and EMAIL_PASSWORD or SENDGRID_API_KEY in .env file');
+  }
+
+  const formattedDate = new Date(date).toLocaleDateString(undefined, {
+    year: 'numeric', month: 'short', day: 'numeric'
+  });
+
+  const subject = `New Appointment Request from ${studentName}`;
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+          .container { background: #ffffff; border-radius: 8px; padding: 24px; border: 1px solid #eaeaea; }
+          .header { background-color: #FF6B35; color: #ffffff; padding: 16px 20px; border-radius: 8px 8px 0 0; }
+          .title { margin: 0; }
+          .row { margin: 8px 0; }
+          .label { color: #555; }
+          .footer { margin-top: 24px; font-size: 12px; color: #777; text-align: center; }
+          .badge { display: inline-block; background: #FFF5F0; border: 1px solid #FF6B35; color: #E55A2B; padding: 4px 8px; border-radius: 12px; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h2 class="title">New Appointment Request</h2>
+          </div>
+          <div style="padding: 16px 8px;">
+            <p>Dear ${facultyName || 'Faculty'},</p>
+            <p><strong>${studentName}</strong> (${studentEmail}) has requested an appointment.</p>
+            <div class="row"><span class="label">Date:</span> <strong>${formattedDate}</strong></div>
+            <div class="row"><span class="label">Time:</span> <strong>${time}</strong></div>
+            <div class="row"><span class="label">Duration:</span> <strong>${duration} minutes</strong></div>
+            <div class="row"><span class="label">Reason:</span> <span class="badge">${reason}</span></div>
+            <p>You can approve or reject this request in the Uniways app.</p>
+            <p>Thank you,<br/>Uniways</p>
+          </div>
+          <div class="footer">This is an automated email regarding appointment requests.</div>
+        </div>
+      </body>
+    </html>
+  `;
+
+  const text = `New Appointment Request\n\n` +
+    `Student: ${studentName} (${studentEmail})\n` +
+    `Date: ${formattedDate}\nTime: ${time}\nDuration: ${duration} minutes\nReason: ${reason}`;
+
+  const mailOptions = {
+    from: `"Uniways" <${process.env.EMAIL_USER?.trim() || 'no-reply@uniways.local'}>`,
+    to: toEmail,
+    subject,
+    html,
+    text,
+  };
+
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log('✅ Appointment notification email sent to faculty:', toEmail, 'messageId:', info.messageId);
+    return true;
+  } catch (error) {
+    console.error('❌ Error sending appointment notification email:', error);
+    throw error;
+  }
+};
+
+export const sendAppointmentStatusEmail = async ({
+  toEmail,
+  studentName,
+  facultyName,
+  status,
+  date,
+  time,
+  duration,
+  reason,
+  meetingLink,
+  facultyNotes,
+}) => {
+  if (!transporter) {
+    throw new Error('Email transporter is not configured. Please set EMAIL_USER and EMAIL_PASSWORD or SENDGRID_API_KEY in .env file');
+  }
+
+  const formattedDate = new Date(date).toLocaleDateString(undefined, {
+    year: 'numeric', month: 'short', day: 'numeric'
+  });
+
+  const normalized = (status || '').toLowerCase();
+  const prettyStatus = normalized.charAt(0).toUpperCase() + normalized.slice(1);
+  const subject = `Your appointment was ${prettyStatus}`;
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+          .container { background: #ffffff; border-radius: 8px; padding: 24px; border: 1px solid #eaeaea; }
+          .header { background-color: #FF6B35; color: #ffffff; padding: 16px 20px; border-radius: 8px 8px 0 0; }
+          .title { margin: 0; }
+          .row { margin: 8px 0; }
+          .label { color: #555; }
+          .badge { display: inline-block; background: #FFF5F0; border: 1px solid #FF6B35; color: #E55A2B; padding: 4px 8px; border-radius: 12px; font-size: 12px; }
+          .footer { margin-top: 24px; font-size: 12px; color: #777; text-align: center; }
+          .note { background:#f7f7f7; border:1px solid #eee; padding:12px; border-radius:8px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h2 class="title">Appointment ${prettyStatus}</h2>
+          </div>
+          <div style="padding: 16px 8px;">
+            <p>Hi ${studentName || 'Student'},</p>
+            <p>Your appointment with <strong>${facultyName || 'Faculty'}</strong> has been <strong>${prettyStatus}</strong>.</p>
+            <div class="row"><span class="label">Date:</span> <strong>${formattedDate}</strong></div>
+            <div class="row"><span class="label">Time:</span> <strong>${time}</strong></div>
+            <div class="row"><span class="label">Duration:</span> <strong>${duration} minutes</strong></div>
+            <div class="row"><span class="label">Reason:</span> <span class="badge">${reason}</span></div>
+            ${meetingLink ? `<div class="row"><span class="label">Meeting Link:</span> <a href="${meetingLink}">${meetingLink}</a></div>` : ''}
+            ${facultyNotes ? `<div class="row note"><span class="label">Faculty Notes:</span><br/>${facultyNotes}</div>` : ''}
+            <p>Thank you,<br/>Uniways</p>
+          </div>
+          <div class="footer">This is an automated email regarding appointment updates.</div>
+        </div>
+      </body>
+    </html>
+  `;
+
+  const text = `Appointment ${prettyStatus}\n\n` +
+    `Faculty: ${facultyName}\n` +
+    `Date: ${formattedDate}\nTime: ${time}\nDuration: ${duration} minutes\nReason: ${reason}` +
+    (meetingLink ? `\nMeeting Link: ${meetingLink}` : '') +
+    (facultyNotes ? `\nFaculty Notes: ${facultyNotes}` : '');
+
+  const mailOptions = {
+    from: `"Uniways" <${process.env.EMAIL_USER?.trim() || 'no-reply@uniways.local'}>`,
+    to: toEmail,
+    subject,
+    html,
+    text,
+  };
+
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log('✅ Appointment status email sent to student:', toEmail, 'messageId:', info.messageId);
+    return true;
+  } catch (error) {
+    console.error('❌ Error sending appointment status email:', error);
+    throw error;
+  }
+};
+
