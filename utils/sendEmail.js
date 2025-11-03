@@ -1,10 +1,32 @@
 import transporter from '../config/email.js';
 
-export const sendPasswordResetEmail = async (email, resetToken) => {
-  // Check if transporter is available
-  if (!transporter) {
-    throw new Error('Email transporter is not configured. Please set EMAIL_USER and EMAIL_PASSWORD in .env file');
+// --- Resend helper ----------------------------------------------------------
+const hasResend = !!process.env.RESEND_API_KEY && process.env.RESEND_API_KEY.trim() !== '';
+
+async function sendViaResend({ from, to, subject, html, text }) {
+  if (!hasResend) {
+    throw new Error('RESEND_API_KEY not configured');
   }
+  const apiKey = process.env.RESEND_API_KEY.trim();
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ from, to, subject, html, text }),
+  });
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    throw new Error(`Resend API error: ${response.status} ${body}`);
+  }
+  const json = await response.json();
+  console.log('✅ Resend email accepted:', json?.id || json);
+  return true;
+}
+
+export const sendPasswordResetEmail = async (email, resetToken) => {
+  const fromAddress = `"Uniways" <${process.env.FROM_ADDRESS?.trim() || process.env.EMAIL_USER?.trim() || 'no-reply@uniways.local'}>`;
 
   try {
     // Create reset URL
@@ -13,8 +35,8 @@ export const sendPasswordResetEmail = async (email, resetToken) => {
       ? `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`
       : `http://localhost:8081/reset-password?token=${resetToken}`;
 
-    const mailOptions = {
-      from: `"Uniways" <${process.env.EMAIL_USER?.trim()}>`,
+    const mail = {
+      from: fromAddress,
       to: email,
       subject: 'Password Reset Request - Uniways',
       html: `
@@ -157,10 +179,15 @@ export const sendPasswordResetEmail = async (email, resetToken) => {
       `,
     };
 
-    const info = await transporter.sendMail(mailOptions);
-    console.log('✅ Password reset email sent successfully');
-    console.log('📧 Email sent to:', email);
-    console.log('📎 Message ID:', info.messageId);
+    if (hasResend) {
+      await sendViaResend(mail);
+    } else {
+      if (!transporter) {
+        throw new Error('Email transporter is not configured. Please set EMAIL_USER/EMAIL_PASSWORD, SENDGRID_API_KEY, or RESEND_API_KEY in .env file');
+      }
+      const info = await transporter.sendMail(mail);
+      console.log('✅ Password reset email sent:', info.messageId);
+    }
     return true;
   } catch (error) {
     console.error('❌ Error sending email:', error);
@@ -183,9 +210,7 @@ export const sendAppointmentNotificationEmail = async ({
   duration,
   reason,
 }) => {
-  if (!transporter) {
-    throw new Error('Email transporter is not configured. Please set EMAIL_USER and EMAIL_PASSWORD or SENDGRID_API_KEY in .env file');
-  }
+  const fromAddress = `"Uniways" <${process.env.FROM_ADDRESS?.trim() || process.env.EMAIL_USER?.trim() || 'no-reply@uniways.local'}>`;
 
   const formattedDate = new Date(date).toLocaleDateString(undefined, {
     year: 'numeric', month: 'short', day: 'numeric'
@@ -232,18 +257,18 @@ export const sendAppointmentNotificationEmail = async ({
   const text = `New Appointment Request\n\n` +
     `Student: ${studentName} (${studentEmail})\n` +
     `Date: ${formattedDate}\nTime: ${time}\nDuration: ${duration} minutes\nReason: ${reason}`;
-
-  const mailOptions = {
-    from: `"Uniways" <${process.env.EMAIL_USER?.trim() || 'no-reply@uniways.local'}>`,
-    to: toEmail,
-    subject,
-    html,
-    text,
-  };
+  const mail = { from: fromAddress, to: toEmail, subject, html, text };
 
   try {
-    const info = await transporter.sendMail(mailOptions);
-    console.log('✅ Appointment notification email sent to faculty:', toEmail, 'messageId:', info.messageId);
+    if (hasResend) {
+      await sendViaResend(mail);
+    } else {
+      if (!transporter) {
+        throw new Error('Email transporter is not configured. Please set EMAIL_USER/EMAIL_PASSWORD, SENDGRID_API_KEY, or RESEND_API_KEY in .env file');
+      }
+      const info = await transporter.sendMail(mail);
+      console.log('✅ Appointment notification email sent to faculty:', toEmail, 'messageId:', info.messageId);
+    }
     return true;
   } catch (error) {
     console.error('❌ Error sending appointment notification email:', error);
@@ -263,9 +288,7 @@ export const sendAppointmentStatusEmail = async ({
   meetingLink,
   facultyNotes,
 }) => {
-  if (!transporter) {
-    throw new Error('Email transporter is not configured. Please set EMAIL_USER and EMAIL_PASSWORD or SENDGRID_API_KEY in .env file');
-  }
+  const fromAddress = `"Uniways" <${process.env.FROM_ADDRESS?.trim() || process.env.EMAIL_USER?.trim() || 'no-reply@uniways.local'}>`;
 
   const formattedDate = new Date(date).toLocaleDateString(undefined, {
     year: 'numeric', month: 'short', day: 'numeric'
@@ -319,18 +342,18 @@ export const sendAppointmentStatusEmail = async ({
     `Date: ${formattedDate}\nTime: ${time}\nDuration: ${duration} minutes\nReason: ${reason}` +
     (meetingLink ? `\nMeeting Link: ${meetingLink}` : '') +
     (facultyNotes ? `\nFaculty Notes: ${facultyNotes}` : '');
-
-  const mailOptions = {
-    from: `"Uniways" <${process.env.EMAIL_USER?.trim() || 'no-reply@uniways.local'}>`,
-    to: toEmail,
-    subject,
-    html,
-    text,
-  };
+  const mail = { from: fromAddress, to: toEmail, subject, html, text };
 
   try {
-    const info = await transporter.sendMail(mailOptions);
-    console.log('✅ Appointment status email sent to student:', toEmail, 'messageId:', info.messageId);
+    if (hasResend) {
+      await sendViaResend(mail);
+    } else {
+      if (!transporter) {
+        throw new Error('Email transporter is not configured. Please set EMAIL_USER/EMAIL_PASSWORD, SENDGRID_API_KEY, or RESEND_API_KEY in .env file');
+      }
+      const info = await transporter.sendMail(mail);
+      console.log('✅ Appointment status email sent to student:', toEmail, 'messageId:', info.messageId);
+    }
     return true;
   } catch (error) {
     console.error('❌ Error sending appointment status email:', error);
