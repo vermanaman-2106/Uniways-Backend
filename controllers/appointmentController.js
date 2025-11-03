@@ -105,24 +105,22 @@ export const createAppointment = async (req, res) => {
     await appointment.populate('studentId', 'name email');
     await appointment.populate('facultyId', 'name email department');
 
-    // Try to send notification email to faculty (non-blocking for user response)
-    try {
-      if (appointment.facultyId?.email) {
-        await sendAppointmentNotificationEmail({
-          toEmail: appointment.facultyId.email,
-          facultyName: appointment.facultyId.name,
-          studentName: appointment.studentId.name,
-          studentEmail: appointment.studentId.email,
-          date: appointment.date,
-          time: appointment.time,
-          duration: appointment.duration,
-          reason: appointment.reason,
-        });
-      } else {
-        console.warn('Faculty email missing; skipping email notification');
-      }
-    } catch (emailErr) {
-      console.warn('Failed to send appointment notification email:', emailErr?.message || emailErr);
+    // Send notification email to faculty in background (fire-and-forget)
+    if (appointment.facultyId?.email) {
+      sendAppointmentNotificationEmail({
+        toEmail: appointment.facultyId.email,
+        facultyName: appointment.facultyId.name,
+        studentName: appointment.studentId.name,
+        studentEmail: appointment.studentId.email,
+        date: appointment.date,
+        time: appointment.time,
+        duration: appointment.duration,
+        reason: appointment.reason,
+      }).catch((emailErr) => {
+        console.warn('Failed to send appointment notification email:', emailErr?.message || emailErr);
+      });
+    } else {
+      console.warn('Faculty email missing; skipping email notification');
     }
 
     res.status(201).json({
