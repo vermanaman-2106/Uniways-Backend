@@ -45,6 +45,9 @@ const userSchema = new mongoose.Schema(
   }
 );
 
+// Create index on email for faster lookups (unique index is automatically created, but explicit index helps)
+userSchema.index({ email: 1 });
+
 // Hash password before saving
 userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) {

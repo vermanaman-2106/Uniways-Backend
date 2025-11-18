@@ -1,6 +1,7 @@
 import User from '../models/User.js';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 import { sendPasswordResetEmail } from '../utils/sendEmail.js';
 
 // Generate JWT Token
@@ -94,8 +95,11 @@ export const login = async (req, res) => {
       });
     }
 
-    // Find user and include password
-    const user = await User.findOne({ email }).select('+password');
+    // Normalize email (lowercase, trim) for faster lookup
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Find user and include password (optimized query with index)
+    const user = await User.findOne({ email: normalizedEmail }).select('+password').lean();
     if (!user) {
       return res.status(401).json({
         success: false,
@@ -103,8 +107,8 @@ export const login = async (req, res) => {
       });
     }
 
-    // Check password
-    const isMatch = await user.matchPassword(password);
+    // Check password (bcrypt comparison)
+    const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(401).json({
         success: false,
