@@ -1,7 +1,9 @@
 import Appointment from '../models/Appointment.js';
 import User from '../models/User.js';
 import FacultyProfile from '../models/Faculty.js';
+import Timetable from '../models/Timetable.js';
 import { sendAppointmentNotificationEmail, sendAppointmentStatusEmail } from '../utils/sendEmail.js';
+import { isTimeOverlapping, parseHHMMToMinutes, parseHourToMinutes } from '../utils/timeUtils.js';
 
 // Create appointment (Student only)
 export const createAppointment = async (req, res) => {
@@ -65,10 +67,73 @@ export const createAppointment = async (req, res) => {
       }
     }
 
+    // Validate date is not in the past
+    const appointmentDate = new Date(date);
+    const now = new Date();
+    if (appointmentDate < now) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot book appointments in the past',
+      });
+    }
+
+    // Availability check: reject if requested time overlaps any teaching slot.
+    const appointmentDurationMinutes = Number(duration);
+    if (!Number.isFinite(appointmentDurationMinutes) || appointmentDurationMinutes <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid duration',
+      });
+    }
+
+    let appointmentStartMinutes;
+    try {
+      appointmentStartMinutes = parseHHMMToMinutes(time);
+    } catch (e) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid appointment time format. Use HH:MM',
+      });
+    }
+
+    const appointmentEndMinutes = appointmentStartMinutes + appointmentDurationMinutes;
+
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    // Use UTC day to avoid timezone shifts introduced by ISO string transport.
+    const dayName = dayNames[appointmentDate.getUTCDay()];
+    const isSupportedTimetableDay = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].includes(
+      dayName
+    );
+
+    if (isSupportedTimetableDay) {
+      const timetableEntries = await Timetable.find({
+        facultyId: facultyUser._id,
+        day: dayName,
+      }).sort({ startTime: 1 });
+
+      const hasConflict = timetableEntries.some((entry) => {
+        const slotStart = parseHourToMinutes(entry.startTime);
+        const slotEnd = parseHourToMinutes(entry.endTime);
+        return isTimeOverlapping(
+          appointmentStartMinutes,
+          appointmentEndMinutes,
+          slotStart,
+          slotEnd
+        );
+      });
+
+      if (hasConflict) {
+        return res.status(400).json({
+          success: false,
+          message: 'Faculty is not available during this time slot',
+        });
+      }
+    }
+
     // Check for double booking (same faculty, date, time)
     const existingAppointment = await Appointment.findOne({
       facultyId: facultyUser._id,
-      date: new Date(date),
+      date: appointmentDate,
       time,
       status: { $in: ['pending', 'approved'] },
     });
@@ -77,16 +142,6 @@ export const createAppointment = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'This time slot is already booked',
-      });
-    }
-
-    // Validate date is not in the past
-    const appointmentDate = new Date(date);
-    const now = new Date();
-    if (appointmentDate < now) {
-      return res.status(400).json({
-        success: false,
-        message: 'Cannot book appointments in the past',
       });
     }
 

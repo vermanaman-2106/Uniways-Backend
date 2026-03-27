@@ -3,6 +3,7 @@ import facultyRoutes from './faculty.js';
 import authRoutes from './auth.js';
 import appointmentRoutes from './appointments.js';
 import complaintRoutes from './complaints.js';
+import timetableRoutes from './timetable.js';
 
 const router = express.Router();
 
@@ -27,6 +28,9 @@ router.use('/appointments', appointmentRoutes);
 
 // Complaint routes
 router.use('/complaints', complaintRoutes);
+
+// Timetable routes
+router.use('/timetable', timetableRoutes);
 
 export default router;
 
