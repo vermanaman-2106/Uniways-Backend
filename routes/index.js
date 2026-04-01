@@ -5,6 +5,13 @@ import appointmentRoutes from './appointments.js';
 import complaintRoutes from './complaints.js';
 import timetableRoutes from './timetable.js';
 
+// ✅ FIXED IMPORTS
+import classroomRoutes from './classroom.js';
+import assignmentRoutes from './assignment.js';
+import submissionRoutes from './submission.js';
+import attendanceRoutes from './attendance.js';
+import userRoutes from './users.js';
+
 const router = express.Router();
 
 // Health check route
@@ -12,25 +19,23 @@ router.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'API is healthy' });
 });
 
-// Example route - you can add more routes here
+// Test route
 router.get('/test', (req, res) => {
   res.json({ message: 'Test route is working!' });
 });
 
-// Authentication routes
-router.use('/auth', authRoutes);
-
-// Faculty routes
+// Existing routes
+  router.use('/auth', authRoutes);
 router.use('/faculty', facultyRoutes);
-
-// Appointment routes
-router.use('/appointments', appointmentRoutes);
-
-// Complaint routes
-router.use('/complaints', complaintRoutes);
-
-// Timetable routes
+  router.use('/appointments', appointmentRoutes);
+  router.use('/complaints', complaintRoutes);
 router.use('/timetable', timetableRoutes);
 
-export default router;
+// ✅ New routes
+router.use('/classroom', classroomRoutes);
+router.use('/assignment', assignmentRoutes);
+router.use('/submission', submissionRoutes);
+        router.use('/attendance', attendanceRoutes);
+router.use('/users', userRoutes);
 
+  export default router;
